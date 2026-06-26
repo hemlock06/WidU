@@ -1,0 +1,31 @@
+# 데이터셋(대용량, scripts/download_data.py 로 재수급) — 절대 커밋 금지
+data/
+
+# 능동학습 수집물(프라이버시: 사용자 신호)
+data/active_learning/
+
+# 생성물(스크립트로 재현 가능)
+artifacts/
+docs/*.pdf
+docs/page-*.jpg
+
+# 모델 롤백 백업
+models/*.bak
+
+# 파이썬
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# 노드(문서 빌드)
+node_modules/
+
+# OS/에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

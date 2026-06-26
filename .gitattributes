@@ -1,0 +1,7 @@
+# OS 간 이식성: 텍스트는 LF 정규화, 바이너리는 그대로
+* text=auto eol=lf
+*.joblib binary
+*.docx binary
+*.npy binary
+*.png binary
+*.zip binary
