@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from widu.config import L2
-from widu.l2_fall import extract_features, FALL_FEATURES
+from widu.falleval import feats  # 공유 헬퍼(DRY)
+from widu.l2_fall import FALL_FEATURES
 from widu.preprocess import resample_antialiased, extract_window
 from widu.augment import augment_train
 from widu.datasets import sisfall, synthetic
@@ -62,8 +63,6 @@ def windows_from_weda(root: Path):
     return W, np.array(Y), np.array(G)
 
 
-def feats(windows):
-    return np.array([extract_features(np.asarray(w, float), L2.FS) for w in windows])
 
 
 def main():

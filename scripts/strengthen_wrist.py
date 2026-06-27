@@ -33,26 +33,19 @@ from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features
 from widu.eval.metrics import binary_metrics
 from widu.datasets import weda, umafall, smartfallmm as smm
+from widu.falleval import cache_windows, feats, DATA   # 공유 헬퍼(DRY)
 
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
 TH = L2.FALL_PROBA_TH_BY_SOURCE["watch"]   # 0.30
 
 
 def cache_feats(gen, src_fs, only_adl=False):
-    X, y, g = [], [], []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4 or (only_adl and lab != 0):
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(w) >= MIN_WIN:
-            X.append(extract_features(np.asarray(w, float), L2.FS)); y.append(int(lab)); g.append(subj)
-    return np.array(X), np.array(y), np.array(g)
+    """(X 특징, y, groups) — cache_windows+feats 와 동일."""
+    w = cache_windows(gen, src_fs, only_adl)
+    return (feats([x for x, _, _ in w]),
+            np.array([l for _, l, _ in w]),
+            np.array([s for _, _, s in w]))
 
 
 def model(name):
