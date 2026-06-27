@@ -1,0 +1,46 @@
+name: CI
+
+# handoff 추가물. ruff(실버그류 린트) + pytest(L0~L2·API 스모크) + 골든 회귀.
+# 기존 소스는 수정하지 않으므로 게이트는 보수적(통과 가능한 범위)으로 설정됨.
+
+on:
+  push:
+    branches: [master, handoff-prep]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Lint (ruff — 실버그류만, 설정은 ruff.toml)
+        run: ruff check .
+
+      - name: Golden regression (동작 불변 가드)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python scripts/golden_check.py check
+
+      - name: Tests (L0~L2 · API smoke)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: pytest tests/ -v
