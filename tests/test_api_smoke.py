@@ -102,7 +102,8 @@ def test_collector_stats(client):
 def test_hr_missing_bpm_returns_400(client):
     r = client.post("/users/uerr/hr", json={"ts": 1000.0, "accuracy": "HIGH"})
     assert r.status_code == 400
-    assert r.get_json()["error"] == "missing_field"
+    # 외과적 검증: 잘못된 입력은 400. 본문에 빠진 필드명이 드러나야 한다.
+    assert "bpm" in (r.get_json().get("detail") or "")
 
 
 def test_hr_bad_accuracy_enum_returns_400(client):
@@ -154,6 +155,26 @@ def test_native_fall_route_returns_emergency(client):
     assert body["level"] == "EMERGENCY"
     for key in ("ts", "level", "reason", "escalation", "context", "detections"):
         assert key in body
+
+
+# --------------------------------------------------------------------------- #
+# P1-2 (외과적): 내부 코드 버그는 400 으로 가리지 않고 500 으로 노출(운영 모니터링)
+# --------------------------------------------------------------------------- #
+def test_internal_error_returns_500(client, monkeypatch):
+    from serving import api as apimod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated internal bug")
+
+    # 정상 입력인데 내부 처리에서 버그가 나면 → 400 이 아니라 500 이어야 한다.
+    # (fixture 의 TESTING=True 는 예외를 전파하므로, 운영과 동일하게 errorhandler 가
+    #  500 을 내도록 PROPAGATE_EXCEPTIONS 를 잠시 끈다.)
+    monkeypatch.setattr(apimod.SP, "ingest_hr", _boom)
+    monkeypatch.setitem(apimod.app.config, "PROPAGATE_EXCEPTIONS", False)
+    r = client.post("/users/u500/hr",
+                    json={"ts": 1000.0, "bpm": 72.0, "accuracy": "HIGH"})
+    assert r.status_code == 500
+    assert r.get_json()["error"] == "internal_error"
 
 
 if __name__ == "__main__":  # pragma: no cover
