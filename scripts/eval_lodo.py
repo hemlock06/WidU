@@ -23,63 +23,33 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
-
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features
 from widu.eval.metrics import binary_metrics
-from widu.datasets import sisfall, weda, umafall, smartfallmm as smm
-
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
+from widu.falleval import (cache_windows, feats, rf, DATA,
+                           src_sisfall, src_weda, src_uma, src_smm, FS)   # 공유 헬퍼(DRY)
 
 
 def _windows(trials, src_fs):
-    """(arr, label, subj) 제너레이터 → (X feats, y, groups)."""
-    X, y, g = [], [], []
-    for arr, lab, subj in trials:
-        if lab < 0 or len(arr) < 4:
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        win = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(win) < MIN_WIN:
-            continue
-        X.append(extract_features(np.asarray(win, float), L2.FS))
-        y.append(int(lab)); g.append(subj)
-    return np.array(X), np.array(y), np.array(g)
-
-
-def _sisfall():
-    for arr, lab, meta in sisfall.iter_dataset(DATA / "SisFall"):
-        yield arr, lab, f"SIS_{meta}"
-
-def _weda():
-    for arr, lab, subj, ft in weda.iter_dataset(DATA / "WEDA_raw"):
-        yield arr, lab, f"WEDA_{subj}"
-
-def _uma(pos):
-    for arr, lab, subj, age in umafall.iter_dataset(DATA / "UMAFall_raw", pos):
-        yield arr, lab, f"UMA_{subj}"
-
-def _smm(group, pos):
-    for arr, lab, subj, act in smm.iter_dataset(DATA / "SmartFallMM", group, pos):
-        yield arr, lab, f"SMM_{subj}"
+    """(arr,lab,subj) 제너레이터 → (X feats, y, groups). cache_windows+feats 와 동일."""
+    w = cache_windows(trials, src_fs)
+    return (feats([x for x, _, _ in w]),
+            np.array([l for _, l, _ in w]),
+            np.array([s for _, _, s in w]))
 
 
 def build_sources(position: str) -> dict:
     print(f"\n[{position}] 특징 추출 중...", flush=True)
     if position == "wrist":
         specs = {
-            "WEDA":        (_weda(), weda.FS),
-            "UMAFall":     (_uma("WRIST"), umafall.FS),
-            "SmartFallMM": (_smm("young", "watch"), smm.FS),
+            "WEDA":        (src_weda(), FS["weda"]),
+            "UMAFall":     (src_uma("WRIST"), FS["uma"]),
+            "SmartFallMM": (src_smm("young", "watch"), FS["smm"]),
         }
     else:  # waist
         specs = {
-            "SisFall":     (_sisfall(), sisfall.FS),
-            "UMAFall":     (_uma("WAIST"), umafall.FS),
-            "SmartFallMM": (_smm("young", "phone"), smm.FS),
+            "SisFall":     (src_sisfall(), FS["sisfall"]),
+            "UMAFall":     (src_uma("WAIST"), FS["uma"]),
+            "SmartFallMM": (src_smm("young", "phone"), FS["smm"]),
         }
     out = {}
     for name, (gen, fs) in specs.items():
@@ -90,11 +60,6 @@ def build_sources(position: str) -> dict:
     return out
 
 
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=0, n_jobs=-1)
-
-
 def lodo(sources: dict, th: float) -> dict:
     names = list(sources)
     rows = {}
@@ -103,7 +68,7 @@ def lodo(sources: dict, th: float) -> dict:
         Xtr = np.vstack([sources[n][0] for n in names if n != held])
         ytr = np.concatenate([sources[n][1] for n in names if n != held])
         Xte, yte, _ = sources[held]
-        clf = _rf().fit(Xtr, ytr)
+        clf = rf().fit(Xtr, ytr)
         proba = clf.predict_proba(Xte)[:, 1]
         pred = (proba >= th).astype(int)
         m = binary_metrics(yte, pred)
@@ -126,7 +91,7 @@ def elderly_fp_probe(wrist_sources: dict, th: float) -> dict:
     """젊은 손목 전 데이터 학습 → 고령 ADL vs 젊은 ADL 오탐율."""
     Xtr = np.vstack([wrist_sources[n][0] for n in wrist_sources])
     ytr = np.concatenate([wrist_sources[n][1] for n in wrist_sources])
-    clf = _rf().fit(Xtr, ytr)
+    clf = rf().fit(Xtr, ytr)
 
     def fp_rate(gen, fs):
         X, y, _ = _windows(gen, fs)
@@ -136,8 +101,8 @@ def elderly_fp_probe(wrist_sources: dict, th: float) -> dict:
         pred = (clf.predict_proba(adl)[:, 1] >= th).astype(int)
         return round(float(pred.mean()), 3), len(adl)
 
-    young_fp, ny = fp_rate(_smm("young", "watch"), smm.FS)   # in-dist ADL(참고)
-    old_fp, no = fp_rate(_smm("old", "watch"), smm.FS)        # 고령 ADL
+    young_fp, ny = fp_rate(src_smm("young", "watch"), FS["smm"])   # in-dist ADL(참고)
+    old_fp, no = fp_rate(src_smm("old", "watch"), FS["smm"])        # 고령 ADL
     return {
         "young_adl_fp_rate": young_fp, "young_adl_n": ny,
         "old_adl_fp_rate": old_fp, "old_adl_n": no,
