@@ -20,17 +20,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from widu.config import L2
+from widu.falleval import feats  # 공유 헬퍼(DRY)
 from widu.datasets import umafall
 from widu.preprocess import extract_window
-from widu.l2_fall import extract_features, FallModel
+from widu.l2_fall import FallModel
 from widu.augment import augment_train
 from widu.eval.metrics import binary_metrics
 
 TH = L2.FALL_PROBA_TH
 
 
-def feats(ws):
-    return np.array([extract_features(np.asarray(w, float), L2.FS) for w in ws])
 
 
 def load_uma(position):

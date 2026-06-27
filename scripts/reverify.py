@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from widu.config import L2
+from widu.falleval import feats  # 공유 헬퍼(DRY)
 from widu.datasets import sisfall
 from widu.preprocess import resample_antialiased, extract_window, smv, butter_lowpass
 from widu.l2_fall import extract_features, FallDetector, FallModel
@@ -31,8 +32,6 @@ def rec(name, ok, detail):
     print(f"[{'OK ' if ok else 'ISSUE'}] {name} — {detail}")
 
 
-def feats(ws):
-    return np.array([extract_features(np.asarray(w, float), L2.FS) for w in ws])
 
 
 def load_all():

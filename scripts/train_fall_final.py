@@ -19,30 +19,14 @@ import joblib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features, FallModel
+from widu.l2_fall import FallModel
 from widu.augment import augment_train, ROTATION_BOUND
 from widu.eval.metrics import binary_metrics
 from widu.datasets import sisfall, weda, umafall, smartfallmm as smm
-
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
-
-
-def cache(gen, src_fs, only_adl=False):
-    out = []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4 or (only_adl and lab != 0):
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(w) >= MIN_WIN:
-            out.append((np.asarray(w, float), int(lab), subj))
-    return out
+from widu.falleval import cache_windows as cache, feats, rf, DATA   # 공유 헬퍼(DRY)
 
 
 def gather(position, use_smm, use_elderly):
@@ -69,13 +53,6 @@ def gather(position, use_smm, use_elderly):
     return wins, np.array(ys), np.array(gs), angle, out
 
 
-def feats(W):
-    return np.array([extract_features(w, L2.FS) for w in W])
-
-
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=0, n_jobs=-1)
 
 
 def main():
@@ -100,7 +77,7 @@ def main():
             Xtr = feats(W); ytr = Y
         else:
             Xtr = feats(trw); ytr = trY
-        clf = _rf().fit(Xtr, ytr)
+        clf = rf().fit(Xtr, ytr)
         proba = clf.predict_proba(feats([wins[i] for i in te]))[:, 1]
         m = binary_metrics(y[te], (proba >= L2.FALL_PROBA_TH).astype(int)).summary()
         sens.append(m["sensitivity"]); prec.append(m["precision"]); f1.append(m["f1"])
@@ -113,7 +90,7 @@ def main():
         Xall = feats(W); yall = Y
     else:
         Xall = feats(wins); yall = y
-    final = _rf().fit(Xall, yall)
+    final = rf().fit(Xall, yall)
 
     # 백업 후 저장 — FallModel 규약은 'bare classifier'(fall_proba가 model.predict_proba 직접 호출)
     if out_path.exists():

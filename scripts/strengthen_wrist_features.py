@@ -25,13 +25,11 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
 from widu.l2_fall import extract_features
 from widu.eval.metrics import binary_metrics
 from widu.datasets import weda, umafall, smartfallmm as smm
+from widu.falleval import cache_windows, DATA   # 공유 헬퍼(DRY)
 
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
 TH = L2.FALL_PROBA_TH_BY_SOURCE["watch"]
 
 
@@ -69,18 +67,6 @@ def extra_feats(win, fs=L2.FS):
     gmag = _smv(gyro)
     cc = float(np.corrcoef(smv, gmag)[0, 1]) if n > 2 and gmag.std() > 0 else 0.0
     return np.array([kurt, sk, dom, band_lo, band_hi, peaks, settle, acpk, cc], float)
-
-
-def cache_windows(gen, src_fs, only_adl=False):
-    out = []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4 or (only_adl and lab != 0):
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(w) >= MIN_WIN:
-            out.append((np.asarray(w, float), int(lab), subj))
-    return out
 
 
 def feats(wins, extended):
