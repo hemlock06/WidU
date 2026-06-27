@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from serving.api import app
+from serving.api import app, SP
 
 
 @pytest.fixture()
@@ -17,17 +17,15 @@ def client():
     return app.test_client()
 
 
-@pytest.mark.xfail(reason="BUG(P1): serving/api.py:41 이 SP._fall_model 참조 — "
-                          "StreamProcessor 에 그 속성 없음 → /healthz 500. "
-                          "docs/HANDOFF_ISSUES.md P1-1 참조. 수정되면 이 마커 제거.",
-                   strict=False)
 def test_healthz(client):
+    # P1-1 수정 후: 과거 AttributeError(500) → 정상 200. fall_model 적재 여부 bool 반환.
     r = client.get("/healthz")
     assert r.status_code == 200
     body = r.get_json()
     assert body["ok"] is True
     assert body["service"] == "widu"
     assert "fall_model" in body
+    assert isinstance(body["fall_model"], bool)
 
 
 def test_post_hr_returns_assessment(client):
@@ -96,6 +94,66 @@ def test_collector_stats(client):
     r = client.get("/collector/stats")
     assert r.status_code == 200
     assert "enabled" in r.get_json()
+
+
+# --------------------------------------------------------------------------- #
+# P1-2 입력 검증 — 잘못된 요청은 500 이 아니라 400 (회귀 가드)
+# --------------------------------------------------------------------------- #
+def test_hr_missing_bpm_returns_400(client):
+    r = client.post("/users/uerr/hr", json={"ts": 1000.0, "accuracy": "HIGH"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "missing_field"
+
+
+def test_hr_bad_accuracy_enum_returns_400(client):
+    r = client.post("/users/uerr/hr", json={"ts": 1000.0, "bpm": 72.0,
+                                            "accuracy": "NONSENSE"})
+    assert r.status_code == 400
+
+
+def test_record_bad_kind_enum_returns_400(client):
+    r = client.post("/users/uerr/record", json={"ts": 1000.0, "kind": "BOGUS",
+                                                "value": 1.0})
+    assert r.status_code == 400
+
+
+def test_hr_non_numeric_bpm_returns_400(client):
+    r = client.post("/users/uerr/hr", json={"ts": 1000.0, "bpm": "abc",
+                                            "accuracy": "HIGH"})
+    assert r.status_code == 400
+
+
+# --------------------------------------------------------------------------- #
+# P1-3 IMU source 수용 — /imu 가 source 를 실제로 파이프라인에 전달하는지(회귀 가드)
+# --------------------------------------------------------------------------- #
+def test_imu_source_phone_is_forwarded(client):
+    uid = "usrc_phone"
+    r = client.post(f"/users/{uid}/imu", json={"ts": 1000.0, "ax": 0.0, "ay": 0.0,
+                                               "az": 1.0, "source": "phone"})
+    assert r.status_code == 200
+    # source 가 전달됐다면 phone 위치 전용 낙상 탐지기가 생성돼 있어야 한다.
+    assert "phone" in SP._users[uid].l2
+
+
+def test_imu_default_source_is_watch(client):
+    uid = "usrc_default"
+    r = client.post(f"/users/{uid}/imu", json={"ts": 1000.0, "ax": 0.0, "ay": 0.0,
+                                               "az": 1.0})
+    assert r.status_code == 200
+    assert "watch" in SP._users[uid].l2
+
+
+# --------------------------------------------------------------------------- #
+# P1-4 네이티브 낙상 라우트 — ingest_fall_event 위임(회귀 가드)
+# --------------------------------------------------------------------------- #
+def test_native_fall_route_returns_emergency(client):
+    r = client.post("/users/unative/native_fall",
+                    json={"ts": 1000.0, "source": "watch", "confidence": 0.95})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["level"] == "EMERGENCY"
+    for key in ("ts", "level", "reason", "escalation", "context", "detections"):
+        assert key in body
 
 
 if __name__ == "__main__":  # pragma: no cover

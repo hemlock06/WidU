@@ -129,7 +129,7 @@ pip install -r requirements.txt          # numpy/pandas/scipy/scikit-learn/jobli
 python scripts/download_data.py --all
 
 python scripts/demo_stream.py            # 5계층 스트리밍 데모
-python serving/api.py                    # 서빙 :5000 (능동학습: WIDU_COLLECT=1)
+python serving/api.py                    # 서빙 :5001 (능동학습: WIDU_COLLECT=1)
 
 # 낙상 모델 재학습(데이터 받은 뒤)
 python scripts/train_fall_final.py --position wrist --smm --elderly

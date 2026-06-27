@@ -17,6 +17,13 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+# Windows 기본 콘솔(cp949)에서 ✅/한글 출력 시 UnicodeEncodeError 크래시 방지(HANDOFF_ISSUES P2-3).
+# PYTHONIOENCODING=utf-8 이 없어도 안전하게 동작. 리다이렉트 등 reconfigure 불가 환경은 조용히 무시.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 from widu.l2_fall import extract_features, FallModel
 from widu.l5_fusion import FusionEngine
 from widu.pipeline import StreamProcessor

@@ -36,9 +36,30 @@ def _ts(d):
     return float(d.get("ts") or time.time())
 
 
+# --- 입력 검증: 잘못된 요청은 500 이 아니라 400 으로 (HANDOFF_ISSUES P1-2) --- #
+# 핸들러가 필수 필드(KeyError)·잘못된 enum/숫자(ValueError)·null/타입오류(TypeError)에
+# 부딪히면 전역적으로 400 + 에러 본문으로 변환한다. 잘못된 JSON 본문은 Flask 가 이미 400.
+@app.errorhandler(KeyError)
+def _err_missing_field(e):
+    return jsonify({"error": "missing_field", "field": str(e).strip("'\"")}), 400
+
+
+@app.errorhandler(ValueError)
+def _err_bad_value(e):
+    return jsonify({"error": "bad_value", "detail": str(e)}), 400
+
+
+@app.errorhandler(TypeError)
+def _err_bad_type(e):
+    return jsonify({"error": "bad_type", "detail": str(e)}), 400
+
+
 @app.get("/healthz")
 def healthz():
-    return jsonify({"ok": True, "service": "widu", "fall_model": SP._fall_model.trained})
+    # 낙상 모델 적재 가능 여부로 readiness 표시. (P1-1: 과거 존재하지 않는 SP._fall_model
+    # 참조로 500 → _model_for("watch") 의 적재 결과를 사용하도록 교정.)
+    return jsonify({"ok": True, "service": "widu",
+                    "fall_model": SP._model_for("watch").trained})
 
 
 @app.post("/users/<uid>/hr")
@@ -52,10 +73,27 @@ def hr(uid):
 @app.post("/users/<uid>/imu")
 def imu(uid):
     d = request.get_json(force=True)
+    # P1-3: source(watch/phone)를 수용해 위치별 모델(손목/허리) 라우팅을 살린다.
+    # 미전달 시 기존 동작 보존(source="watch"). (IMUSample.accuracy 는 현재 파이프라인에서
+    # 소비되지 않아 의도적으로 받지 않는다 — HR 의 Accuracy enum 과 혼동 방지.)
     a = SP.ingest_imu(uid, IMUSample(
         _ts(d), float(d["ax"]), float(d["ay"]), float(d["az"]),
-        float(d.get("gx", 0)), float(d.get("gy", 0)), float(d.get("gz", 0))))
+        float(d.get("gx", 0)), float(d.get("gy", 0)), float(d.get("gz", 0)),
+        source=d.get("source", "watch")))
     return jsonify(a.to_dict() if a else {"status": "ok"})
+
+
+@app.post("/users/<uid>/native_fall")
+def native_fall(uid):
+    """네이티브 낙상(애플 CMFallDetectionManager / 삼성 FALL_DETECTED) 위임 라우트.
+
+    body: {source?, confidence?, ts?}. 구현된 StreamProcessor.ingest_fall_event 에 위임
+    (HANDOFF_ISSUES P1-4 — 메서드는 있었으나 HTTP 진입점이 없었음).
+    """
+    d = request.get_json(force=True)
+    a = SP.ingest_fall_event(uid, _ts(d), source=d.get("source", "watch"),
+                             confidence=float(d.get("confidence", 0.95)))
+    return jsonify(a.to_dict())
 
 
 @app.post("/users/<uid>/location")

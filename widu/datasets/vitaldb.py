@@ -13,7 +13,7 @@ Web API (HTTP GET):
 from __future__ import annotations
 
 import io
-from typing import List, Optional
+from typing import List
 
 BASE = "https://api.vitaldb.net"
 

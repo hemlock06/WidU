@@ -12,10 +12,6 @@ extend-exclude = ["scripts", "docs", "data", "artifacts", "models", "build"]
 [lint]
 select = ["E9", "F"]
 
-[lint.per-file-ignores]
-# 기존(레거시) 미사용 import — handoff 시점 동결. '추가만' 원칙상 소스 미수정.
-# 새로 추가되는 코드에는 F401 이 그대로 적용된다. 정리는 HANDOFF_ISSUES P2-2.
-"widu/gating.py" = ["F401"]
-"widu/pipeline.py" = ["F401"]
-"widu/datasets/sisfall.py" = ["F401"]
-"widu/datasets/vitaldb.py" = ["F401"]
+# HANDOFF_ISSUES P2-2 해소: 레거시 미사용 import 4건(gating:time, pipeline:ActivityContext,
+# sisfall:List, vitaldb:Optional)을 제거하여 per-file-ignores(F401 동결) 전부 삭제함.
+# 이제 widu/ 전체에 F401 이 그대로 적용된다(미사용 import 신규 유입 차단).
