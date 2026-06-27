@@ -19,35 +19,19 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import extract_window
-from widu.l2_fall import extract_features
 from widu.datasets import weda, umafall, smartfallmm as smm
-
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
+from widu.falleval import cache_windows, feats, rf, DATA   # 공유 헬퍼(DRY)
 
 
 def windows(gen, src_fs=L2.FS):
-    from widu.preprocess import resample_antialiased
-    X, y, g = [], [], []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4:
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        win = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(win) < MIN_WIN:
-            continue
-        X.append(extract_features(np.asarray(win, float), L2.FS)); y.append(int(lab)); g.append(subj)
-    return np.array(X), np.array(y), np.array(g)
-
-
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=0, n_jobs=-1)
+    """(X 특징, y, groups) — cache_windows+feats 와 동일 전처리."""
+    w = cache_windows(gen, src_fs)
+    return (feats([x for x, _, _ in w]),
+            np.array([l for _, l, _ in w]),
+            np.array([s for _, _, s in w]))
 
 
 def main():
@@ -70,11 +54,11 @@ def main():
     for tr, te in gkf.split(Xo, np.zeros(len(Xo)), go):
         Xo_tr, Xo_te = Xo[tr], Xo[te]
         # 베이스라인: 젊은층만
-        clf0 = _rf().fit(Xyoung, yyoung)
+        clf0 = rf().fit(Xyoung, yyoung)
         base_fp.append(float((clf0.predict_proba(Xo_te)[:, 1] >= th).mean()))
         # 처방: 젊은층 + 학습측 고령ADL(음성으로)
         Xmit = np.vstack([Xyoung, Xo_tr]); ymit = np.concatenate([yyoung, np.zeros(len(Xo_tr), int)])
-        clf1 = _rf().fit(Xmit, ymit)
+        clf1 = rf().fit(Xmit, ymit)
         mit_fp.append(float((clf1.predict_proba(Xo_te)[:, 1] >= th).mean()))
 
     report = {

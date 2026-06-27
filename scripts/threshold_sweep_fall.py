@@ -16,39 +16,14 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features
 from widu.eval.metrics import binary_metrics
 from widu.datasets import sisfall, weda, umafall, smartfallmm as smm
+from widu.falleval import cache_windows as cache, feats, rf, DATA   # 공유 헬퍼(DRY)
 
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
 THS = [0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
-
-
-def cache(gen, src_fs, only_adl=False):
-    out = []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4 or (only_adl and lab != 0):
-            continue
-        a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-        w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(w) >= MIN_WIN:
-            out.append((np.asarray(w, float), int(lab), subj))
-    return out
-
-
-def feats(W):
-    return np.array([extract_features(w, L2.FS) for w in W])
-
-
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=0, n_jobs=-1)
 
 
 def lodo_probas(young: dict, elderly):
@@ -65,7 +40,7 @@ def lodo_probas(young: dict, elderly):
         if elderly:
             for w, _, _ in elderly:
                 trw.append(w); trY.append(0)
-        clf = _rf().fit(feats(trw), np.array(trY))
+        clf = rf().fit(feats(trw), np.array(trY))
         teX = feats([w for w, _, _ in young[held]])
         teY = np.array([l for _, l, _ in young[held]])
         folds.append((teY, clf.predict_proba(teX)[:, 1]))
@@ -81,7 +56,7 @@ def elderly_probas(young: dict, elderly):
     for tr, te in GroupKFold(5).split(Xo, np.zeros(len(Xo)), go):
         trw = list(yw) + [elderly[i][0] for i in tr]
         trY = list(yy) + [0] * len(tr)
-        clf = _rf().fit(feats(trw), np.array(trY))
+        clf = rf().fit(feats(trw), np.array(trY))
         teX = feats([elderly[i][0] for i in te])
         probs.append(clf.predict_proba(teX)[:, 1])
     return probs
@@ -128,7 +103,7 @@ def main():
     # 레거시는 고령 미학습 → 전체 고령에 단일 FP(임계별)
     yw = [w for n in young_a for w, _, _ in young_a[n]]
     yy = [l for n in young_a for _, l, _ in young_a[n]]
-    clf = _rf().fit(feats(yw), np.array(yy))
+    clf = rf().fit(feats(yw), np.array(yy))
     eldX = feats([w for w, _, _ in eld_a])
     eld_pr_single = [clf.predict_proba(eldX)[:, 1]]
     report["waist_C1"] = sweep(lodo_probas(young_a, None), eld_pr_single)

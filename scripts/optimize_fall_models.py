@@ -23,47 +23,15 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GroupKFold
 
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features
 from widu.augment import augment_train, ROTATION_BOUND
 from widu.eval.metrics import binary_metrics
 from widu.datasets import sisfall, weda, umafall, smartfallmm as smm
+from widu.falleval import cache_windows, feats, rf, DATA, MIN_WIN   # 공유 헬퍼(DRY)
 
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
 RS = 0
-
-
-# ----------------------------- 윈도우 캐시 ----------------------------- #
-def _win(arr, src_fs):
-    a = arr if src_fs == L2.FS else resample_antialiased(arr, src_fs, L2.FS)
-    w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-    return w if len(w) >= MIN_WIN else None
-
-
-def cache_source(gen, src_fs):
-    """→ list[(window(N,6), label, subj)]"""
-    out = []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4:
-            continue
-        w = _win(arr, src_fs)
-        if w is not None:
-            out.append((np.asarray(w, float), int(lab), subj))
-    return out
-
-
-def feats(windows):
-    return np.array([extract_features(w, L2.FS) for w in windows])
-
-
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=RS, n_jobs=-1)
 
 
 def _fit_eval(tr_wins, tr_y, tr_g, te_X, te_y, aug, angle):
@@ -73,7 +41,7 @@ def _fit_eval(tr_wins, tr_y, tr_g, te_X, te_y, aug, angle):
         Xtr = feats(W); ytr = Y
     else:
         Xtr = feats(tr_wins); ytr = np.asarray(tr_y)
-    clf = _rf().fit(Xtr, ytr)
+    clf = rf().fit(Xtr, ytr)
     proba = clf.predict_proba(te_X)[:, 1]
     return clf, proba
 
@@ -148,21 +116,21 @@ def cv_recall(young: dict, aug, angle, th):
 def build(position):
     if position == "wrist":
         legacy = {
-            "WEDA": cache_source(weda.iter_dataset(DATA / "WEDA_raw"), weda.FS),
-            "UMAFall": cache_source(umafall.iter_dataset(DATA / "UMAFall_raw", "WRIST"), umafall.FS),
+            "WEDA": cache_windows(weda.iter_dataset(DATA / "WEDA_raw"), weda.FS),
+            "UMAFall": cache_windows(umafall.iter_dataset(DATA / "UMAFall_raw", "WRIST"), umafall.FS),
         }
-        smm_young = cache_source(smm.iter_dataset(DATA / "SmartFallMM", "young", "watch"), smm.FS)
+        smm_young = cache_windows(smm.iter_dataset(DATA / "SmartFallMM", "young", "watch"), smm.FS)
         elderly = [(w, l, s) for w, l, s in
-                   cache_source(smm.iter_dataset(DATA / "SmartFallMM", "old", "watch"), smm.FS) if l == 0]
+                   cache_windows(smm.iter_dataset(DATA / "SmartFallMM", "old", "watch"), smm.FS) if l == 0]
         angle = ROTATION_BOUND["watch"]
     else:
         legacy = {
-            "SisFall": cache_source(sisfall.iter_dataset(DATA / "SisFall"), sisfall.FS),
-            "UMAFall": cache_source(umafall.iter_dataset(DATA / "UMAFall_raw", "WAIST"), umafall.FS),
+            "SisFall": cache_windows(sisfall.iter_dataset(DATA / "SisFall"), sisfall.FS),
+            "UMAFall": cache_windows(umafall.iter_dataset(DATA / "UMAFall_raw", "WAIST"), umafall.FS),
         }
-        smm_young = cache_source(smm.iter_dataset(DATA / "SmartFallMM", "young", "phone"), smm.FS)
+        smm_young = cache_windows(smm.iter_dataset(DATA / "SmartFallMM", "young", "phone"), smm.FS)
         elderly = [(w, l, s) for w, l, s in
-                   cache_source(smm.iter_dataset(DATA / "SmartFallMM", "old", "phone"), smm.FS) if l == 0]
+                   cache_windows(smm.iter_dataset(DATA / "SmartFallMM", "old", "phone"), smm.FS) if l == 0]
         angle = ROTATION_BOUND["phone"]
     return legacy, smm_young, elderly, angle
 

@@ -18,38 +18,22 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from sklearn.ensemble import RandomForestClassifier
-
 from widu.config import L2
-from widu.preprocess import resample_antialiased, extract_window
-from widu.l2_fall import extract_features, _smv
+from widu.l2_fall import _smv
 from widu.datasets import weda, umafall, smartfallmm as smm
+from widu.falleval import cache_windows, feats, rf, DATA   # 공유 헬퍼(DRY)
 
-DATA = ROOT / "data"
-MIN_WIN = int(L2.WIN_SEC * L2.FS * 0.5)
 ARM_G = 2.5      # L3 fall_unrecovered 무장 충격(POST_FALL_ARM_G) = 비분류기 복구 하한
 SOFTS = [0.05, 0.08, 0.10, 0.12, 0.15, 0.20, 0.25]
 
 
 def cache(gen, fs):
-    """→ (X feats, y, impact_max) per window."""
-    X, y, im = [], [], []
-    for arr, lab, subj, *_ in gen:
-        if lab < 0 or len(arr) < 4:
-            continue
-        a = arr if fs == L2.FS else resample_antialiased(arr, fs, L2.FS)
-        w = extract_window(a, L2.FS, L2.WIN_SEC, pre_frac=0.75)
-        if len(w) < MIN_WIN:
-            continue
-        w = np.asarray(w, float)
-        X.append(extract_features(w, L2.FS)); y.append(int(lab))
-        im.append(float(_smv(w[:, :3]).max()))
-    return np.array(X), np.array(y), np.array(im)
-
-
-def _rf():
-    return RandomForestClassifier(n_estimators=300, class_weight="balanced",
-                                  random_state=0, n_jobs=-1)
+    """→ (X feats, y, impact_max). cache_windows 와 동일 전처리 + 윈도우별 최대 충격."""
+    w = cache_windows(gen, fs)
+    X = feats([x for x, _, _ in w])
+    y = np.array([l for _, l, _ in w])
+    im = np.array([float(_smv(np.asarray(x, float)[:, :3]).max()) for x, _, _ in w])
+    return X, y, im
 
 
 def main():
@@ -70,7 +54,7 @@ def main():
     for held in names:
         Xtr = np.vstack([sources[n][0] for n in names if n != held])
         ytr = np.concatenate([sources[n][1] for n in names if n != held])
-        clf = _rf().fit(Xtr, ytr)
+        clf = rf().fit(Xtr, ytr)
         Xh, yh, imh = sources[held]
         pr = clf.predict_proba(Xh)[:, 1]
         per[held] = {"proba": pr, "y": yh, "impact": imh,

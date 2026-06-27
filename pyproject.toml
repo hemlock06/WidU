@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "widu"
+version = "0.20.0"
+description = "독거 고령자 실시간 위급상황 탐지 AI — 5계층 파이프라인"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "joblib",
+    "flask",
+]
+
+[tool.setuptools]
+packages = ["widu", "widu.datasets", "widu.eval"]
+
+# 설치: pip install -e .  (이후 어디서든 `import widu`)
+# 미설치 시에도 scripts/*.py 는 자체 ROOT 부트스트랩으로 직접 실행 가능.
