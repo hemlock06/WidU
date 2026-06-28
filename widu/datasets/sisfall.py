@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Iterator, List, Tuple
+from typing import Iterator, Tuple
 
 import numpy as np
 

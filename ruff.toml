@@ -1,0 +1,17 @@
+# ruff 설정 (handoff 추가물) — 기존 소스는 수정하지 않으므로 '실버그류'만 게이트.
+#
+# 철학: 대량 스타일 재포맷을 레거시에 강요하지 않는다. 구문오류(E9)와
+# pyflakes(F: 미정의 이름·미사용 import/변수) = 실제 결함 위주로 막고,
+# 연구/데모 스크립트(scripts/)의 의도적 terse 스타일(세미콜론·import 전 부트스트랩)은 제외.
+# 누적된 스타일 정리는 docs/HANDOFF_ISSUES.md (P2) 참조.
+line-length = 100
+
+# 연구·데모·산출물·데이터는 린트 대상에서 제외(핵심: widu/ serving/ tests/).
+extend-exclude = ["scripts", "docs", "data", "artifacts", "models", "build"]
+
+[lint]
+select = ["E9", "F"]
+
+# HANDOFF_ISSUES P2-2 해소: 레거시 미사용 import 4건(gating:time, pipeline:ActivityContext,
+# sisfall:List, vitaldb:Optional)을 제거하여 per-file-ignores(F401 동결) 전부 삭제함.
+# 이제 widu/ 전체에 F401 이 그대로 적용된다(미사용 import 신규 유입 차단).

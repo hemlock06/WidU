@@ -125,7 +125,9 @@ class L4:
 class L5:
     ALERT_BUDGET_PER_DAY = 6          # 사용자/일 알림 상한(보호자 신뢰 보호)
     SELF_CHECK_SEC = 45              # "괜찮으세요?" 응답 대기(초)
-    ESCALATION = ["in_app", "watch_haptic", "guardian_push", "auto_call"]
+    # 소비측이 화이트리스트로 검증할 수 있도록 _escalate() 가 실제 반환하는 모든 값을 포함.
+    # self_check = 낙상 회색지대(fall_suspected)에서 본인 확인 단계(예산 미소모). HANDOFF_ISSUES P2-6.
+    ESCALATION = ["in_app", "watch_haptic", "guardian_push", "auto_call", "self_check"]
 
 
 # 활동맥락 추정(가속도 SMA 기반) 임계 — g 단위

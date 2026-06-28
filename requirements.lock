@@ -1,0 +1,34 @@
+# requirements.lock - reproducible exact version pins (HANDOFF_ISSUES P1-5)
+#
+# Purpose: remove non-determinism for "unattended + reproducible" operation.
+# requirements.txt only has lower bounds (>=), so a major upgrade could change
+# behavior or model compatibility (in particular, a scikit-learn version change
+# can cause models/*.joblib deserialization warnings/failures).
+#
+# NOTE: ASCII-only on purpose. pip may decode a requirements file with the
+# system locale (e.g. cp949 on Windows); non-ASCII comments can break parsing.
+# Korean rationale lives in docs/IMPROVE_SUMMARY.md and models/VERSIONS.md.
+#
+# Verified environment (tests pass with these exact pins):
+#   - Python 3.11.15 (Windows)
+#   - pytest: 39 passed, 0 xfailed
+#   - scripts/golden_check.py check: 11/11 cases identical (behavior unchanged)
+#   - models/*.joblib load with NO InconsistentVersionWarning at scikit-learn 1.9.0
+#
+# Usage:  pip install -r requirements.lock
+# Caveat: numpy 2.4 / pandas 3.0 / scikit-learn 1.9 target Python >= 3.11.
+#         The CI matrix's Python 3.9 job installs via requirements.txt (ranges),
+#         NOT this lock (3.9 compat is out of scope - see docs/IMPROVE_PROPOSALS.md).
+
+# --- runtime ---
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+scikit-learn==1.9.0
+joblib==1.5.3
+flask==3.1.3
+requests==2.33.0
+
+# --- dev/CI (test + lint) ---
+pytest==9.1.1
+ruff==0.15.20

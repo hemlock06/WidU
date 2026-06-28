@@ -11,7 +11,14 @@
 진입점: widu.pipeline.StreamProcessor
 """
 
-__version__ = "0.1.0"
+# 버전 단일 출처 = 패키지 메타데이터(pyproject.toml). 설치본이면 그 값을,
+# 소스 직접 실행(미설치)이면 pyproject 와 동일한 폴백 문자열을 쓴다.
+# (HANDOFF_ISSUES P2-1: __init__ 0.1.0 ↔ pyproject 0.20.0 불일치 해소.)
+try:
+    from importlib.metadata import version as _pkg_version, PackageNotFoundError
+    __version__ = _pkg_version("widu")
+except (ImportError, PackageNotFoundError):
+    __version__ = "0.20.0"
 
 from . import config  # noqa: F401
 from .types import (  # noqa: F401

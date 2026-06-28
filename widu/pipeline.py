@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from .types import (HRSample, IMUSample, LocSample, RecordSample,
-                    Assessment, AlertLevel, ActivityContext, Detection)
+                    Assessment, AlertLevel, Detection)
 from .gating import quality_gate, ActivityEstimator
 from .l0_safety import L0Safety
 from .l1_hr import PersonalHRModel
