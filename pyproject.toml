@@ -7,7 +7,7 @@ name = "widu"
 version = "0.20.0"
 description = "독거 고령자 실시간 위급상황 탐지 AI — 5계층 파이프라인"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "pandas",
