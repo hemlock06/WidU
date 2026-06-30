@@ -129,6 +129,36 @@ def main():
     print(f"보완) 워치 놓침→폰이 건짐: {miss_watch_caught_phone}/{nf} · "
           f"폰 놓침→워치가 건짐: {miss_phone_caught_watch}/{nf}")
 
+    # --- 회색지대 교차확인 분석(가설 검증) --- #
+    # 질문: 워치·폰이 둘 다 '약한 의심'(SOFT≤proba<임계, 현재 self_check行)일 때
+    # 그게 단일 의심보다 정밀한가? '확신 발화'에 근접하나? → 격상/단축확인 정당화 여부.
+    SOFT = L2.FALL_PROBA_SOFT
+    falls = labs == 1
+    wg = (pw >= SOFT) & (pw < TH_WATCH)   # 워치 회색지대
+    pg = (pa >= SOFT) & (pa < TH_PHONE)   # 폰 회색지대
+    cw = pw >= TH_WATCH; cp = pa >= TH_PHONE   # 확신(≥임계)
+
+    def line(name, m):
+        n = int(m.sum()); f = int((m & falls).sum())
+        p = f / n if n else float("nan")
+        print(f"  {name:<18} trial {n:>4} · 낙상 {f:>4} · ADL {n-f:>4} · precision {p:.3f}")
+
+    print(f"\n{'='*64}\n회색지대 교차확인 분석 (SOFT={SOFT} ≤ proba < 임계; 현재 self_check行)\n{'='*64}")
+    print("[회색지대]")
+    line("워치 회색 단독", wg)
+    line("폰 회색 단독", pg)
+    line("양쪽 회색 동시", wg & pg)
+    print("[비교: 확신(≥임계)]")
+    line("워치 확신 단독", cw)
+    line("폰 확신 단독", cp)
+    line("양쪽 확신 동시", cw & cp)
+    # 양쪽 회색이 현재 놓치는 게 아니라 self_check로 가는 낙상 — 이들 중 진짜 낙상 비율이
+    # 확신에 근접하면 '양쪽 회색 → 격상' 정당, ADL이 섞이면 self_check 유지가 옳음.
+    bg = wg & pg
+    bg_fall = int((bg & falls).sum()); bg_adl = int((bg & ~falls).sum())
+    print(f"\n판정 근거: 양쪽 회색 동시 = 낙상 {bg_fall} vs ADL {bg_adl} "
+          f"→ {'정밀(격상 검토 가치)' if bg_fall and bg_adl == 0 else 'ADL 혼입(self_check 유지)' if bg_adl else '표본 없음'}")
+
 
 if __name__ == "__main__":
     main()
