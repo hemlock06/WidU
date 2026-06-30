@@ -71,6 +71,7 @@ WidU 파이프라인을 **수급(데이터) → 학습 → 검증 → 최적화 
 | 스크립트 | 하는 일 |
 |---|---|
 | [benchmark_vs_baseline](benchmark_vs_baseline.md) | **원본(WIDYU-ai) vs WidU** 머리맞대 — 오경보율·응급 탐지(동일 입력) |
+| [benchmark_device_configs](benchmark_device_configs.md) | **기기 구성**(워치만/폰만/둘다) 낙상 탐지 — UMAFall 동기 손목·허리, 피험자 분리 |
 
 ---
 
