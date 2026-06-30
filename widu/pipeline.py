@@ -196,12 +196,13 @@ class StreamProcessor:
         워치가 자체 검출한 낙상을 그대로 수용(우리 IMU 분류 불필요). 같은 융합·교차검증·
         미회복 안전망이 적용된다. 폰(우리 모델)과 동시 감지 시 L5 교차확인.
 
-        ★플랫폼 제약(2026-06-30 통화→당일 애플 1차 문서 검증으로 정정): iOS는 **iPhone 앱
-        단독으론** 애플워치 낙상 알림을 못 받지만, **watchOS 컴패니언 앱**이면 가능 —
-        CMFallDetectionManager(단 com.apple.developer.health.fall-detection 엔타이틀먼트
-        애플 승인 필요·재량). 안드(삼성 Wear OS FALL_DETECTED)는 더 수월. 진짜 병목은
-        watchOS 앱 유무·엔타이틀먼트 승인이며, 어느 쪽이든 **우리 L2 모델이 주력/안전망**이고
-        네이티브는 보강이다(네이티브 승인·가용을 가정하지 말 것).
+        ★현황(2026-06-30 앱 repo GB-able/WIDYU-widyu 코드 직접 확인): 이 네이티브 경로는
+        **아직 라이브 아님**. 현 워치=Wear OS(심박만 수집, IMU·낙상 코드 전무), 애플워치
+        앱은 미완(WIP). 디바이스 IMU 파이프라인 자체가 계획 단계 → 현 시점 L2의 라이브
+        데이터 소스 없음. 향후 네이티브 낙상 가용 시: iOS=애플 공식 CMFallDetectionManager
+        (엔타이틀먼트 com.apple.developer.health.fall-detection 승인 필요), 안드=오픈 API
+        없음(삼성 Health SDK 파트너십)→안드는 우리 L2가 주력. 어느 쪽이든 native 승인·가용을
+        가정하지 말 것(우리 L2가 안전망).
         """
         st = self._state(user)
         st.last_ts = ts
