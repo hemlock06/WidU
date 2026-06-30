@@ -29,3 +29,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Claude Code 세션 로컬
+.claude/

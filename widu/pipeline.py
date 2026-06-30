@@ -191,10 +191,15 @@ class StreamProcessor:
 
     def ingest_fall_event(self, user: str, ts: float, source: str = "watch",
                           confidence: float = 0.95) -> Assessment:
-        """네이티브 낙상 이벤트 입력(애플 CMFallDetectionManager / 삼성 FALL_DETECTED).
+        """네이티브 낙상 이벤트 입력(삼성 Health Services FALL_DETECTED / Wear OS 등).
 
         워치가 자체 검출한 낙상을 그대로 수용(우리 IMU 분류 불필요). 같은 융합·교차검증·
         미회복 안전망이 적용된다. 폰(우리 모델)과 동시 감지 시 L5 교차확인.
+
+        ★플랫폼 제약(2026-06-30 WIDYU 팀 확인): **iOS는 애플워치 낙상 '알림'을 앱이
+        가져올 수 없다**(센서 원본만 접근 가능). 따라서 iOS에서는 이 경로가 사실상 미가용 →
+        raw 자이로 → 우리 L2 모델이 *주력*이다. 이 경로는 플랫폼이 낙상 이벤트를 노출하는
+        경우(삼성 Wear OS 등)에 한해 보강으로 쓴다. (네이티브를 '주력'이라 가정하지 말 것.)
         """
         st = self._state(user)
         st.last_ts = ts
